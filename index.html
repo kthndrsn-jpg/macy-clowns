@@ -349,16 +349,28 @@ function attachShot(card, crew){
   if(!slug) return;
   const frame = card.querySelector('.shot');
   const img = frame.querySelector('img');
-  let tried = 0;
-  img.addEventListener('load', () => frame.classList.add('loaded'));
-  img.addEventListener('error', () => {
-    tried++;
-    if(tried === 1){ img.src = 'img/' + slug + '.jpg'; }
-    else if(tried === 2){ img.src = 'img/' + slug + '.png'; }
-  });
-  img.alt = crew.n + ' in the Macy\'s Thanksgiving Day Parade';
-  img.loading = 'lazy';
-  img.src = photos[slug] ? ('data:image/jpeg;base64,' + photos[slug]) : ('img/' + slug + '.jpg');
+
+  // Source order: inline photo bank if this build has one, then files on disk.
+  const srcs = [];
+  if(typeof photos !== 'undefined' && photos[slug]){
+    srcs.push('data:image/jpeg;base64,' + photos[slug]);
+  }
+  srcs.push('img/' + slug + '.jpg', 'img/' + slug + '.png');
+
+  // Probe with a detached Image. A lazy <img> inside a display:none frame
+  // never fires load, which would keep the frame hidden forever.
+  let i = 0;
+  const probe = new Image();
+  probe.onload = () => {
+    img.alt = crew.n + ' in the Macy\'s Thanksgiving Day Parade';
+    img.src = probe.src;
+    frame.classList.add('loaded');
+  };
+  probe.onerror = () => {
+    i++;
+    if(i < srcs.length) probe.src = srcs[i];
+  };
+  probe.src = srcs[0];
 }
 
 const grid = document.getElementById('grid');
