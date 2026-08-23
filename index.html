@@ -68,6 +68,8 @@
   .chip[aria-pressed="true"]{background:var(--marquee);color:var(--predawn);border-color:var(--marquee)}
   .chip-pinned{border-color:var(--marquee);color:var(--marquee)}
   .chip-pinned[aria-pressed="true"]{background:var(--marquee);color:var(--predawn)}
+  .chip-export{border-color:var(--mint);color:var(--mint)}
+  .chip-export:hover{background:var(--mint);color:var(--predawn);border-color:var(--mint)}
   .chip:focus-visible,.card:focus-visible,.pin:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 
   /* ---- grid ---- */
@@ -138,6 +140,40 @@
 
   .empty{padding:60px 0;color:var(--muted);text-align:center}
 
+
+  /* ---- contact sheet (PDF export) ---- */
+  .sheet-head{display:none}
+  @media print{
+    @page{size:letter portrait;margin:0.45in}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{background:#fff;color:#14122E;font-size:11px}
+    .wrap{max-width:none;padding:0}
+    header,.controls,.shortlist,.empty,.card-foot,.desc,.flag{display:none!important}
+
+    .sheet-head{display:block;margin:0 0 14px;padding-bottom:8px;border-bottom:1.5px solid #14122E}
+    .sheet-head h2{font-family:'Bungee',sans-serif;font-size:17px;margin:0 0 3px;color:#14122E;letter-spacing:0}
+    .sheet-head p{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+      letter-spacing:.14em;font-size:9.5px;color:#5C567F;margin:0}
+
+    .grid{display:grid!important;grid-template-columns:repeat(3,1fr);gap:12px;
+      background:none;border:0}
+    .card{background:none;padding:0;break-inside:avoid;page-break-inside:avoid;
+      box-shadow:none!important;gap:0}
+    .card.picked{background:none;box-shadow:none!important}
+    .shot{display:block!important;margin:0 0 5px;aspect-ratio:3/2;border:1px solid #CFC9E6;
+      border-radius:2px;overflow:hidden;background:#EEEBF7}
+    .card-top{gap:6px;align-items:flex-start}
+    .nose{width:8px;height:8px;margin-top:4px;border:0.5px solid rgba(0,0,0,.15)}
+    .name{font-size:12px;line-height:1.15;color:#14122E}
+    .meta{font-size:8.5px;letter-spacing:.11em;color:#7A20A0;margin-top:1px}
+    .tagline{font-size:9.5px;color:#5C567F;margin-top:3px;line-height:1.3}
+
+    .sheet-foot{display:block;margin-top:16px;padding-top:7px;border-top:1px solid #CFC9E6;
+      font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
+      letter-spacing:.12em;font-size:8.5px;color:#7A7396}
+  }
+  .sheet-foot{display:none}
+
   @media (prefers-reduced-motion:reduce){
     *{transition:none!important}
     html{scroll-behavior:auto}
@@ -163,6 +199,7 @@
   <div class="controls-inner" id="chips">
     <button class="chip" data-filter="all" aria-pressed="true">All 42</button>
     <button class="chip chip-pinned" id="chip-pinned" data-filter="pinned" aria-pressed="false" hidden>Pinned <span id="pin-count">0</span></button>
+    <button class="chip chip-export" id="chip-export" hidden>Export PDF</button>
     <button class="chip" data-filter="food" aria-pressed="false">Food</button>
     <button class="chip" data-filter="winter" aria-pressed="false">Winter</button>
     <button class="chip" data-filter="service" aria-pressed="false">Uniforms</button>
@@ -175,8 +212,13 @@
 </nav>
 
 <div class="wrap">
+  <div class="sheet-head" id="sheet-head">
+  <h2>Clown Crew Shortlist</h2>
+  <p id="sheet-sub">Macy's Thanksgiving Day Parade</p>
+</div>
   <div class="grid" id="grid"></div>
   <p class="empty" id="empty" hidden>No crews in that theme.</p>
+  <div class="sheet-foot" id="sheet-foot">Macy's Thanksgiving Day Parade &middot; crew reference</div>
 </div>
 
 <aside class="shortlist" id="shortlist" aria-live="polite">
@@ -508,6 +550,7 @@ function renderPicks(){
   const chip = document.getElementById('chip-pinned');
   document.getElementById('pin-count').textContent = picked.size;
   chip.hidden = picked.size === 0;
+  document.getElementById('chip-export').hidden = picked.size === 0;
   if(picked.size === 0 && current === 'pinned'){
     current = 'all';
     document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.filter === 'all')));
@@ -530,6 +573,35 @@ document.getElementById('clear').addEventListener('click', () => {
   picked.clear();
   render(current);
   renderPicks();
+});
+
+// ---- contact sheet export ----
+const exportBtn = document.getElementById('chip-export');
+
+function buildSheetHead(){
+  const names = [...picked];
+  const when = new Date().toLocaleDateString(undefined, {month:'long', day:'numeric', year:'numeric'});
+  document.getElementById('sheet-sub').textContent =
+    names.length + (names.length === 1 ? ' crew' : ' crews') + ' \u00b7 ' + when;
+}
+
+exportBtn.addEventListener('click', () => {
+  if(picked.size === 0) return;
+  const restore = current;
+  current = 'pinned';
+  document.querySelectorAll('.chip').forEach(c =>
+    c.setAttribute('aria-pressed', String(c.dataset.filter === 'pinned')));
+  render('pinned');
+  buildSheetHead();
+  const back = () => {
+    current = restore;
+    document.querySelectorAll('.chip').forEach(c =>
+      c.setAttribute('aria-pressed', String(c.dataset.filter === restore)));
+    render(restore);
+    window.removeEventListener('afterprint', back);
+  };
+  window.addEventListener('afterprint', back);
+  setTimeout(() => window.print(), 120);
 });
 
 render('all');
