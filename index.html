@@ -66,6 +66,8 @@
   }
   .chip:hover{color:var(--paper);border-color:var(--muted)}
   .chip[aria-pressed="true"]{background:var(--marquee);color:var(--predawn);border-color:var(--marquee)}
+  .chip-pinned{border-color:var(--marquee);color:var(--marquee)}
+  .chip-pinned[aria-pressed="true"]{background:var(--marquee);color:var(--predawn)}
   .chip:focus-visible,.card:focus-visible,.pin:focus-visible{outline:2px solid var(--mint);outline-offset:2px}
 
   /* ---- grid ---- */
@@ -160,6 +162,7 @@
 <nav class="controls" aria-label="Filter crews by theme">
   <div class="controls-inner" id="chips">
     <button class="chip" data-filter="all" aria-pressed="true">All 42</button>
+    <button class="chip chip-pinned" id="chip-pinned" data-filter="pinned" aria-pressed="false" hidden>Pinned <span id="pin-count">0</span></button>
     <button class="chip" data-filter="food" aria-pressed="false">Food</button>
     <button class="chip" data-filter="winter" aria-pressed="false">Winter</button>
     <button class="chip" data-filter="service" aria-pressed="false">Uniforms</button>
@@ -441,8 +444,14 @@ const picked = new Set();
 
 function render(filter){
   grid.innerHTML = '';
-  const shown = crews.filter(c => filter === 'all' || c.t === filter);
+  const shown = crews.filter(c =>
+    filter === 'all' ? true :
+    filter === 'pinned' ? picked.has(c.n) :
+    c.t === filter);
   empty.hidden = shown.length > 0;
+  empty.textContent = filter === 'pinned'
+    ? 'Nothing pinned yet. Hit Pin on a crew to build a shortlist.'
+    : 'No crews in that theme.';
 
   shown.forEach(c => {
     const card = document.createElement('article');
@@ -469,8 +478,8 @@ function render(filter){
 
     card.querySelector('.pin').addEventListener('click', () => {
       picked.has(c.n) ? picked.delete(c.n) : picked.add(c.n);
-      render(filter);
       renderPicks();
+      render(current);
     });
 
     attachShot(card, c);
@@ -496,6 +505,14 @@ function renderPicks(){
     el.appendChild(x);
     picksEl.appendChild(el);
   });
+  const chip = document.getElementById('chip-pinned');
+  document.getElementById('pin-count').textContent = picked.size;
+  chip.hidden = picked.size === 0;
+  if(picked.size === 0 && current === 'pinned'){
+    current = 'all';
+    document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.filter === 'all')));
+    render('all');
+  }
   shortlist.classList.toggle('open', picked.size > 0);
   document.querySelector('.wrap:last-of-type').style.paddingBottom = picked.size > 0 ? '200px' : '160px';
 }
