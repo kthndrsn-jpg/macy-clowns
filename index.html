@@ -155,13 +155,17 @@
     .sheet-head p{font-family:'Barlow Condensed',sans-serif;text-transform:uppercase;
       letter-spacing:.14em;font-size:9.5px;color:#5C567F;margin:0}
 
-    .grid{display:grid!important;grid-template-columns:repeat(3,1fr);gap:12px;
-      background:none;border:0}
-    .card{background:none;padding:0;break-inside:avoid;page-break-inside:avoid;
-      box-shadow:none!important;gap:0}
+    /* Chrome does not fragment CSS Grid reliably when printing, so the sheet
+       falls back to inline-block columns, which paginate correctly. */
+    .grid{display:block!important;background:none;border:0;font-size:0}
+    .card{display:inline-block!important;width:32.4%;margin:0 1.4% 14px 0;
+      vertical-align:top;background:none;padding:0;gap:0;font-size:11px;
+      break-inside:avoid;page-break-inside:avoid;box-shadow:none!important}
+    .card:nth-child(3n){margin-right:0}
     .card.picked{background:none;box-shadow:none!important}
-    .shot{display:block!important;margin:0 0 5px;aspect-ratio:3/2;border:1px solid #CFC9E6;
-      border-radius:2px;overflow:hidden;background:#EEEBF7}
+    .shot{display:block!important;margin:0 0 5px;height:88px;border:1px solid #CFC9E6;
+      border-radius:2px;overflow:hidden}
+    .shot img{width:100%;height:100%;object-fit:cover}
     .card-top{gap:6px;align-items:flex-start}
     .nose{width:8px;height:8px;margin-top:4px;border:0.5px solid rgba(0,0,0,.15)}
     .name{font-size:12px;line-height:1.15;color:#14122E}
@@ -593,7 +597,10 @@ exportBtn.addEventListener('click', () => {
     c.setAttribute('aria-pressed', String(c.dataset.filter === 'pinned')));
   render('pinned');
   buildSheetHead();
+  let restored = false;
   const back = () => {
+    if(restored) return;
+    restored = true;
     current = restore;
     document.querySelectorAll('.chip').forEach(c =>
       c.setAttribute('aria-pressed', String(c.dataset.filter === restore)));
@@ -601,7 +608,14 @@ exportBtn.addEventListener('click', () => {
     window.removeEventListener('afterprint', back);
   };
   window.addEventListener('afterprint', back);
-  setTimeout(() => window.print(), 120);
+
+  // Wait for every card image to finish decoding, or 2s, whichever is first.
+  const imgs = [...document.querySelectorAll('.shot img')];
+  const ready = Promise.all(imgs.map(i => i.complete ? Promise.resolve()
+    : new Promise(r => { i.addEventListener('load', r, {once:true});
+                         i.addEventListener('error', r, {once:true}); })));
+  Promise.race([ready, new Promise(r => setTimeout(r, 2000))])
+    .then(() => { window.print(); setTimeout(back, 800); });
 });
 
 render('all');
